@@ -1,13 +1,43 @@
 xquery version "1.0-ml";
 declare namespace ts="http://marklogic.com/MLU/top-songs";
+import module namespace search = "http://marklogic.com/appservices/search" at
+"/MarkLogic/appservices/search/search.xqy";
+
+declare variable $options :=
+	<options xmlns="http://marklogic.com/appservices/search">
+		<transform-results apply="raw"/>
+	</options>;
 
 declare function local:result-controller()
 {
 	if(xdmp:get-request-field("q"))
-	then "Search results here"
+	then local:search-results()
 	else 	if(xdmp:get-request-field("uri"))
 			then local:song-detail()
 			else local:default-results()
+};
+
+declare function local:search-results()
+{
+	let $q := xdmp:get-request-field("q")
+	let $results :=
+	for $song in search:search($q, $options)/search:result
+	return <div>
+		<div class="songname">"{$song//ts:title/text()}" by
+			{$song//ts:artist/text()}</div>
+		<div class="week"> ending week: {fn:data($song//ts:weeks/@last)}
+			(total weeks: {fn:count($song//ts:weeks/ts:week)})</div>
+		{if ($song//ts:genres/ts:genre)
+		then <div class="genre">genre: {fn:lower-case(fn:string-join(($song//ts:genres/ts:genre), ", "))}</div>
+else ()}
+<div class="description">{fn:tokenize($song//ts:descr, " ")[1 to 70]} ...&#160;<a
+href="index.xqy?uri={xdmp:url-encode($song/@uri)}">[more]</a>
+</div>
+</div>
+	return
+		if($results)
+		then $results
+		else <div>Sorry, no results for your search.<br/><br/><br/></div>
 };
 
 declare function local:default-results()
@@ -71,7 +101,7 @@ xdmp:set-response-content-type("text/html; charset=utf-8"),
 <div id="rightcol">
   <form name="form1" method="get" action="index.xqy" id="form1">
   <div id="searchdiv">
-    <input type="text" name="q" id="q" size="50"/><button type="button" id="reset_button" onclick="document.getElementById('bday').value = ''; document.getElementById('q').value = ''; document.location.href='index.xqy'">x</button>&#160;
+    <input type="text" name="q" id="q" size="50"  value="{xdmp:get-request-field("q")}" /><button type="button" id="reset_button" onclick="document.getElementById('bday').value = ''; document.getElementById('q').value = ''; document.location.href='index.xqy'">x</button>&#160;
     <input style="border:0; width:0; height:0; background-color: #A7C030" type="text" size="0" maxlength="0"/><input type="submit" id="submitbtn" name="submitbtn" value="search"/>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;<a href="advanced.xqy">advanced search</a>
   </div>
   <div id="detaildiv">
